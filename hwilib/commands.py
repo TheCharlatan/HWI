@@ -26,7 +26,6 @@ def get_client(device_type, device_path, password=''):
         if client:
             client.close()
         raise UnknownDeviceError('Unknown device type specified')
-
     return client
 
 # Get a list of all available hardware wallets
@@ -42,7 +41,7 @@ def enumerate(password=''):
     return result
 
 # Fingerprint or device type required
-def find_device(device_path, password='', device_type=None, fingerprint=None):
+def find_device(password='', device_type=None, fingerprint=None):
     devices = enumerate(password)
     for d in devices:
         if device_type is not None and d['type'] != device_type and d['model'] != device_type:
