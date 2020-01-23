@@ -6,7 +6,7 @@ import importlib
 import platform
 
 from .serializations import PSBT
-from .base58 import get_xpub_fingerprint_as_id, get_xpub_fingerprint_hex, xpub_to_pub_hex
+from .base58 import xpub_to_pub_hex
 from .errors import UnknownDeviceError, BAD_ARGUMENT, NOT_IMPLEMENTED
 from .descriptor import Descriptor
 from .devices import __all__ as all_devs
@@ -53,8 +53,7 @@ def find_device(device_path, password='', device_type=None, fingerprint=None):
 
             master_fpr = d.get('fingerprint', None)
             if master_fpr is None:
-                master_xpub = client.get_pubkey_at_path('m/0h')['xpub']
-                master_fpr = get_xpub_fingerprint_hex(master_xpub)
+                master_fpr = client.get_master_fingerprint()
 
             if fingerprint and master_fpr != fingerprint:
                 client.close()
@@ -88,11 +87,11 @@ def getkeypool_inner(client, path, start, end, internal=False, keypool=True, acc
         return {'error': 'Both `--wpkh` and `--sh_wpkh` can not be selected at the same time.', 'code': BAD_ARGUMENT}
 
     try:
-        master_xpub = client.get_pubkey_at_path('m/0h')['xpub']
+        master_fpr = client.get_master_fingerprint()
     except NotImplementedError as e:
         return {'error': str(e), 'code': NOT_IMPLEMENTED}
 
-    desc = getdescriptor(client, master_xpub, client.is_testnet, path, internal, sh_wpkh, wpkh, account, start, end)
+    desc = getdescriptor(client, master_fpr, client.is_testnet, path, internal, sh_wpkh, wpkh, account, start, end)
 
     if not isinstance(desc, Descriptor):
         return desc
@@ -107,8 +106,7 @@ def getkeypool_inner(client, path, start, end, internal=False, keypool=True, acc
     this_import['watchonly'] = True
     return [this_import]
 
-def getdescriptor(client, master_xpub, testnet=False, path=None, internal=False, sh_wpkh=False, wpkh=True, account=0, start=None, end=None):
-    master_fpr = get_xpub_fingerprint_as_id(master_xpub)
+def getdescriptor(client, master_fpr, testnet=False, path=None, internal=False, sh_wpkh=False, wpkh=True, account=0, start=None, end=None):
     testnet = client.is_testnet
 
     if not path:
@@ -175,7 +173,7 @@ def getkeypool(client, path, start, end, internal=False, keypool=True, account=0
 
 def getdescriptors(client, account=0):
     try:
-        master_xpub = client.get_pubkey_at_path('m/0h')['xpub']
+        master_fpr = client.get_master_fingerprint()
     except NotImplementedError as e:
         return {'error': str(e), 'code': NOT_IMPLEMENTED}
 
@@ -183,9 +181,9 @@ def getdescriptors(client, account=0):
 
     for internal in [False, True]:
         descriptors = []
-        desc1 = getdescriptor(client, master_xpub=master_xpub, testnet=client.is_testnet, internal=internal, sh_wpkh=False, wpkh=False, account=account)
-        desc2 = getdescriptor(client, master_xpub=master_xpub, testnet=client.is_testnet, internal=internal, sh_wpkh=True, wpkh=False, account=account)
-        desc3 = getdescriptor(client, master_xpub=master_xpub, testnet=client.is_testnet, internal=internal, sh_wpkh=False, wpkh=True, account=account)
+        desc1 = getdescriptor(client, master_fpr=master_fpr, testnet=client.is_testnet, internal=internal, sh_wpkh=False, wpkh=False, account=account)
+        desc2 = getdescriptor(client, master_fpr=master_fpr, testnet=client.is_testnet, internal=internal, sh_wpkh=True, wpkh=False, account=account)
+        desc3 = getdescriptor(client, master_fpr=master_fpr, testnet=client.is_testnet, internal=internal, sh_wpkh=False, wpkh=True, account=account)
         for desc in [desc1, desc2, desc3]:
             if not isinstance(desc, Descriptor):
                 return desc
@@ -204,8 +202,7 @@ def displayaddress(client, path=None, desc=None, sh_wpkh=False, wpkh=False):
         return client.display_address(path, sh_wpkh, wpkh)
     elif desc is not None:
         if client.fingerprint is None:
-            master_xpub = client.get_pubkey_at_path('m/0h')['xpub']
-            client.fingerprint = get_xpub_fingerprint_hex(master_xpub)
+            client.fingerprint = client.get_master_fingerprint()
 
         if sh_wpkh or wpkh:
             return {'error': ' `--wpkh` and `--sh_wpkh` can not be combined with --desc', 'code': BAD_ARGUMENT}
